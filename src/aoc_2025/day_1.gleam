@@ -7,7 +7,7 @@ pub opaque type Direction {
   Right
 }
 
-fn turn_times(from: Int, turn: #(Int, Direction), saw_zero: Int) -> #(Int, Int) {
+fn tick_times(from: Int, turn: #(Int, Direction), saw_zero: Int) -> #(Int, Int) {
   let #(times, dir) = turn
   let next = case dir {
     Left ->
@@ -27,14 +27,14 @@ fn turn_times(from: Int, turn: #(Int, Direction), saw_zero: Int) -> #(Int, Int) 
   }
   case times - 1 {
     0 -> #(next, saw_zero)
-    times -> turn_times(next, #(times, dir), saw_zero)
+    times -> tick_times(next, #(times, dir), saw_zero)
   }
 }
 
 fn run(turns: List(#(Int, Direction)), on_turn: fn(Int, #(Int, Int)) -> Int) {
   let #(_, zeroes) =
     list.fold(turns, #(50, 0), fn(acc, turn) {
-      let #(next, saw_zeroes) = turn_times(acc.0, turn, 0)
+      let #(next, saw_zeroes) = tick_times(acc.0, turn, 0)
       #(next, on_turn(acc.1, #(next, saw_zeroes)))
     })
 

@@ -45,13 +45,12 @@ fn is_invalid(n: Int, static_chunks: Option(Int)) -> Bool {
   let digits_len = list.length(digits)
 
   case static_chunks {
-    Some(static_chunks) -> {
-      case digits_len % static_chunks, digits_len / static_chunks {
-        0, size -> check_chunks(digits, digits_len, size, size)
-        _, _ -> False
-      }
+    Some(static_chunks) if digits_len % static_chunks == 0 -> {
+      let size = digits_len / static_chunks
+      check_chunks(digits, digits_len, size, size)
     }
     None -> check_chunks(digits, digits_len, 1, digits_len / 2)
+    _ -> False
   }
 }
 

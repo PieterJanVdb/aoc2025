@@ -29,10 +29,8 @@ fn get_invalid_ids_loop(
     False -> invalids
   }
 
-  case start >= end {
-    True -> invalids
-    False -> get_invalid_ids_loop(start + 1, end, static_chunks, invalids)
-  }
+  use <- bool.guard(when: start >= end, return: invalids)
+  get_invalid_ids_loop(start + 1, end, static_chunks, invalids)
 }
 
 fn get_invalid_ids(start: Int, end: Int, static_chunks: Option(Int)) {

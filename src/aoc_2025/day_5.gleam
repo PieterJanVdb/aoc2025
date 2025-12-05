@@ -1,7 +1,6 @@
 import gleam/int
 import gleam/list
 import gleam/pair
-import gleam/set.{type Set}
 import gleam/string
 
 fn split_input(input: String) {
@@ -89,7 +88,6 @@ pub fn pt_1(input: String) {
 
 pub fn pt_2(input: String) {
   let ranges = split_input(input) |> pair.map_first(parse_ranges) |> pair.first
-  echo consolidate_ranges(ranges)
   consolidate_ranges(ranges)
   |> list.fold(0, fn(acc, range) { acc + range.1 - range.0 + 1 })
 }

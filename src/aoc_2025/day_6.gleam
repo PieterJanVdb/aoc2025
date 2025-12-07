@@ -62,14 +62,15 @@ fn cell_to_int(cell: List(String)) -> Int {
 }
 
 fn solve(problems: List(#(Op, List(Int)))) {
-  int.sum(
-    list.fold(problem.1, 0, fn(acc, nr) {
+  list.fold(problems, 0, fn(acc, problem) {
+    acc
+    + list.fold(problem.1, 0, fn(acc, nr) {
       case acc {
         0 -> nr
         _ -> problem.0(acc, nr)
       }
-    }),
-  )
+    })
+  })
 }
 
 // TODO: do parsing and solving in a single pass

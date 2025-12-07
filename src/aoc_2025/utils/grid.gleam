@@ -6,6 +6,12 @@ import gleam/order
 import gleam/pair
 import gleam/string
 
+pub type Coord =
+  #(Int, Int)
+
+pub type Grid(a) =
+  dict.Dict(Coord, a)
+
 pub type Direction {
   N
   E
@@ -17,10 +23,7 @@ pub type Direction {
   NW
 }
 
-pub fn new_mapped(
-  input: String,
-  mapper: fn(String) -> a,
-) -> Dict(#(Int, Int), a) {
+pub fn new_mapped(input: String, mapper: fn(String) -> a) -> Grid(a) {
   string.split(input, "\n")
   |> list.index_fold(dict.new(), fn(grid, line, r_idx) {
     string.split(line, "")

@@ -37,8 +37,12 @@ fn trace_loop(grid: Grid(Tile), pos: Coord, cell: Cell(Dict(Coord, Int))) {
         Error(_) -> Ok(0)
         Ok(Empty) | Ok(Start) -> trace_loop(grid, #(pos.0 + 2, pos.1), cell)
         Ok(Splitter) -> {
-          use left <- result.try(trace_loop(grid, #(pos.0, pos.1 - 1), cell))
-          use right <- result.try(trace_loop(grid, #(pos.0, pos.1 + 1), cell))
+          use left <- result.try(trace_loop(grid, #(pos.0 + 2, pos.1 - 1), cell))
+          use right <- result.try(trace_loop(
+            grid,
+            #(pos.0 + 2, pos.1 + 1),
+            cell,
+          ))
           let timelines = left + right + 1
 
           use timelines_map <- result.try(cell.read(cell))

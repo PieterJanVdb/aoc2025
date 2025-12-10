@@ -20,6 +20,7 @@
             pkgs.erlang
             pkgs.rebar3
             pkgs.gleam
+            pkgs.z3
           ];
         };
       }

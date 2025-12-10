@@ -1,5 +1,6 @@
 import aoc_2025/utils/int_extra
 import gleam/bool
+import gleam/dict.{type Dict}
 import gleam/int
 import gleam/list
 import gleam/option
@@ -7,14 +8,18 @@ import gleam/regexp
 import gleam/result
 import gleam/set.{type Set}
 import gleam/string
+import shellout
+import simplifile
+import temporary
 
 pub type Machine {
   Machine(
     diagram: Int,
+    diagram_len: Int,
     state: Int,
-    buttons: List(Int),
+    buttons: List(Set(Int)),
     pressed: Set(Int),
-    requirements: List(Int),
+    requirements: Dict(Int, Int),
   )
 }
 
@@ -24,7 +29,7 @@ fn parse_light_diagram(input: String) {
   #(diagram, string.length(bin_str))
 }
 
-fn parse_buttons(input: String, diagram_len: Int) -> List(Int) {
+fn parse_buttons(input: String) -> List(Set(Int)) {
   let assert Ok(buttons_re) = regexp.from_string("\\(([^)]+)\\)")
 
   regexp.scan(buttons_re, input)
@@ -33,16 +38,16 @@ fn parse_buttons(input: String, diagram_len: Int) -> List(Int) {
     |> list.map(fn(button) {
       string.split(button, ",")
       |> list.map(int_extra.parse)
-      |> list.fold(0, fn(mask, button_idx) {
-        let right_index = diagram_len - 1 - button_idx
-        int.bitwise_or(mask, int.bitwise_shift_left(1, right_index))
-      })
+      |> set.from_list()
     })
   })
 }
 
 fn parse_requirements(input: String) {
-  string.split(input, ",") |> list.map(int_extra.parse)
+  string.split(input, ",")
+  |> list.map(int_extra.parse)
+  |> list.index_map(fn(x, i) { #(i, x) })
+  |> dict.from_list
 }
 
 fn parse(input: String) {
@@ -56,24 +61,33 @@ fn parse(input: String) {
     let #(diagram, diagram_len) = parse_light_diagram(diagram)
     Machine(
       diagram:,
+      diagram_len:,
       state: 0,
-      buttons: parse_buttons(buttons, diagram_len),
+      buttons: parse_buttons(buttons),
       pressed: set.new(),
       requirements: parse_requirements(requirements),
     )
   })
 }
 
-fn press(machine: Machine, button: Int) {
+fn indexes_to_bitwise_int(s: Set(Int), diagram_len: Int) -> Int {
+  set.fold(s, 0, fn(acc, i) {
+    let right_index = diagram_len - 1 - i
+    int.bitwise_or(acc, int.bitwise_shift_left(1, right_index))
+  })
+}
+
+fn press(machine: Machine, button: Set(Int)) {
+  let bitwise_button = indexes_to_bitwise_int(button, machine.diagram_len)
   Machine(
     ..machine,
-    pressed: set.insert(machine.pressed, button),
-    state: int.bitwise_exclusive_or(machine.state, button),
+    pressed: set.insert(machine.pressed, bitwise_button),
+    state: int.bitwise_exclusive_or(machine.state, bitwise_button),
   )
 }
 
 fn shortest_loop(
-  queue: List(#(Int, Machine)),
+  queue: List(#(Set(Int), Machine)),
   visited: Set(Set(Int)),
 ) -> Result(Int, Nil) {
   case queue {
@@ -93,7 +107,8 @@ fn shortest_loop(
       let next_visited = set.insert(visited, machine.pressed)
 
       let next_queue =
-        list.map(machine.buttons, fn(button) { #(button, machine) })
+        list.filter(machine.buttons, fn(b) { b != button })
+        |> list.map(fn(button) { #(button, machine) })
         |> list.append(rest, _)
 
       shortest_loop(next_queue, next_visited)
@@ -102,15 +117,58 @@ fn shortest_loop(
 }
 
 fn shortest(machine: Machine) {
-  shortest_loop([#(0, machine)], set.new())
+  shortest_loop([#(set.new(), machine)], set.new())
 }
 
 pub fn pt_1(input: String) {
   parse(input) |> list.map(shortest) |> result.values() |> int.sum()
-  // let assert [a, b, c] = parse(input)
-  // echo shortest(a)
+}
+
+fn var(i: Int) -> String {
+  " x" <> int.to_string(i)
 }
 
 pub fn pt_2(input: String) {
-  todo as "part 2 not implemented"
+  parse(input)
+  |> list.map(fn(m) {
+    let formula =
+      "(set-logic LIA) (set-option :produce-models true)"
+      <> list.index_fold(m.buttons, "", fn(acc, _, i) {
+        let v = var(i)
+        acc <> " (declare-const" <> v <> " Int) (assert (>=" <> v <> " 0))"
+      })
+      <> list.fold(dict.to_list(m.requirements), "", fn(acc, p) {
+        let vs =
+          list.index_fold(m.buttons, "", fn(acc, b, i) {
+            case set.contains(b, p.0) {
+              True -> acc <> var(i)
+              False -> acc
+            }
+          })
+        acc <> " (assert (= (+" <> vs <> ") " <> int.to_string(p.1) <> "))"
+      })
+      <> " (minimize (+"
+      <> list.index_fold(m.buttons, "", fn(acc, _, i) { acc <> var(i) })
+      <> ")) (check-sat) (get-objectives) (exit)"
+    let assert Ok(res) =
+      temporary.create(temporary.file(), fn(file_path) {
+        let assert Ok(_) = simplifile.write(formula, to: file_path)
+        shellout.command("z3", with: [file_path], in: ".", opt: [])
+      })
+      as "Failed to create temporary file"
+    let output = case res {
+      Ok(output) -> output
+      Error(#(i, output)) ->
+        panic as {
+          "Z3 command failed with exit status "
+          <> int.to_string(i)
+          <> " and output: "
+          <> output
+        }
+    }
+    let assert [_, " " <> n, ..] = string.split(output, ")")
+      as { "Unexpected Z3 output: " <> output }
+    int_extra.parse(n)
+  })
+  |> int.sum
 }

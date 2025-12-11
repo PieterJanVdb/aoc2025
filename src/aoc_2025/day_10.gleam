@@ -128,6 +128,7 @@ fn var(i: Int) -> String {
   " x" <> int.to_string(i)
 }
 
+// Thanks to https://whitespace.moe/lily/gleam_aoc/src/branch/main/src/aoc_2025/day_10.gleam
 pub fn pt_2(input: String) {
   parse(input)
   |> list.map(fn(m) {

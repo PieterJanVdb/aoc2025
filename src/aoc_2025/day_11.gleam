@@ -1,6 +1,6 @@
-import cell
 import gleam/dict.{type Dict}
 import gleam/list
+import gleam/pair
 import gleam/result
 import gleam/set.{type Set}
 import gleam/string
@@ -17,48 +17,36 @@ fn parse(input: String) {
 
 fn paths_loop(
   graph: Dict(String, List(String)),
-  cache_cell: cell.Cell(Dict(#(String, Set(String)), Int)),
+  cache: Dict(#(String, Set(String)), Int),
   node: String,
   required: Set(String),
   visited_required: Set(String),
-) -> Int {
-  let assert Ok(cache) = cell.read(cache_cell)
+) -> #(Int, Dict(#(String, Set(String)), Int)) {
   case dict.get(cache, #(node, visited_required)) {
-    Ok(n) -> n
+    Ok(n) -> #(n, cache)
     Error(Nil) -> {
       case node {
         "out" -> {
           case required == visited_required {
-            True -> 1
-            False -> 0
+            True -> #(1, cache)
+            False -> #(0, cache)
           }
         }
-
         _ -> {
           dict.get(graph, node)
           |> result.unwrap([])
-          |> list.fold(0, fn(acc, neighbour) {
+          |> list.fold(#(0, cache), fn(acc, neighbour) {
+            let #(n_acc, cache) = acc
+
             let visited_required = case set.contains(required, node) {
               True -> set.insert(visited_required, node)
               False -> visited_required
             }
 
-            let n =
-              paths_loop(
-                graph,
-                cache_cell,
-                neighbour,
-                required,
-                visited_required,
-              )
+            let #(n, cache) =
+              paths_loop(graph, cache, neighbour, required, visited_required)
 
-            let assert Ok(cache) = cell.read(cache_cell)
-            let _ =
-              cell.write(
-                cache_cell,
-                dict.insert(cache, #(neighbour, visited_required), n),
-              )
-            acc + n
+            #(n_acc + n, dict.insert(cache, #(neighbour, visited_required), n))
           })
         }
       }
@@ -71,9 +59,8 @@ fn paths(
   start: String,
   required: Set(String),
 ) {
-  let cell = cell.new_table() |> cell.new()
-  let _ = cell.write(cell, dict.new())
-  paths_loop(graph, cell, start, required, set.new())
+  paths_loop(graph, dict.new(), start, required, set.new())
+  |> pair.first()
 }
 
 pub fn pt_1(input: String) {

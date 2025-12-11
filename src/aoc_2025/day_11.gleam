@@ -1,8 +1,6 @@
-import gleam/bool
+import cell
 import gleam/dict.{type Dict}
-import gleam/int
 import gleam/list
-import gleam/pair
 import gleam/result
 import gleam/set.{type Set}
 import gleam/string
@@ -17,73 +15,72 @@ fn parse(input: String) {
   |> dict.from_list()
 }
 
-fn sort_loop(
-  node: String,
-  graph: Dict(String, List(String)),
-  stack: List(String),
-  visited: Set(String),
-) {
-  use <- bool.guard(set.contains(visited, node), #(stack, visited))
-
-  let next_visited = set.insert(visited, node)
-  let neighbours = dict.get(graph, node) |> result.unwrap([])
-
-  list.fold(neighbours, #(stack, next_visited), fn(acc, neighbour) {
-    let #(stack, visited) = acc
-    case set.contains(visited, neighbour) {
-      False -> sort_loop(neighbour, graph, stack, visited)
-      True -> acc
-    }
-  })
-  |> pair.map_first(list.prepend(_, node))
-}
-
-fn sort(graph: Dict(String, List(String))) {
-  let visited = set.new()
-  let stack = []
-
-  dict.fold(graph, #(stack, visited), fn(acc, node, _) {
-    sort_loop(node, graph, acc.0, acc.1)
-  })
-  |> pair.first()
-  |> list.reverse()
-}
-
 fn paths_loop(
   graph: Dict(String, List(String)),
-  nodes: List(String),
-  counts: Dict(String, Int),
-) -> Dict(String, Int) {
-  case nodes {
-    [] -> counts
-    [node, ..rest] -> {
+  cache_cell: cell.Cell(Dict(#(String, Set(String)), Int)),
+  node: String,
+  required: Set(String),
+  visited_required: Set(String),
+) -> Int {
+  let assert Ok(cache) = cell.read(cache_cell)
+  case dict.get(cache, #(node, visited_required)) {
+    Ok(n) -> n
+    Error(Nil) -> {
       case node {
-        "out" -> dict.insert(counts, "out", 1)
-        _ ->
+        "out" -> {
+          case required == visited_required {
+            True -> 1
+            False -> 0
+          }
+        }
+
+        _ -> {
           dict.get(graph, node)
           |> result.unwrap([])
-          |> list.map(fn(neighbour) {
-            dict.get(counts, neighbour) |> result.unwrap(0)
+          |> list.fold(0, fn(acc, neighbour) {
+            let visited_required = case set.contains(required, node) {
+              True -> set.insert(visited_required, node)
+              False -> visited_required
+            }
+
+            let n =
+              paths_loop(
+                graph,
+                cache_cell,
+                neighbour,
+                required,
+                visited_required,
+              )
+
+            let assert Ok(cache) = cell.read(cache_cell)
+            let _ =
+              cell.write(
+                cache_cell,
+                dict.insert(cache, #(neighbour, visited_required), n),
+              )
+            acc + n
           })
-          |> int.sum()
-          |> dict.insert(counts, node, _)
+        }
       }
-      |> paths_loop(graph, rest, _)
     }
   }
 }
 
-fn paths(graph: Dict(String, List(String)), sorted_nodes: List(String)) {
-  let assert Ok(paths) =
-    paths_loop(graph, sorted_nodes, dict.new()) |> dict.get("you")
-  paths
+fn paths(
+  graph: Dict(String, List(String)),
+  start: String,
+  required: Set(String),
+) {
+  let cell = cell.new_table() |> cell.new()
+  let _ = cell.write(cell, dict.new())
+  paths_loop(graph, cell, start, required, set.new())
 }
 
 pub fn pt_1(input: String) {
-  let graph = parse(input)
-  sort(graph) |> paths(graph, _)
+  parse(input) |> paths("you", set.new())
 }
 
 pub fn pt_2(input: String) {
-  todo as "part 2 not implemented"
+  let required = set.new() |> set.insert("dac") |> set.insert("fft")
+  parse(input) |> paths("svr", required)
 }
